@@ -144,7 +144,7 @@ void bi_show(bigint* x, char base)
 	int wordLen = x->wordLen;
 
 	if (sign == 1)
-		printf("- ");
+		printf("-");
 	
 	if (base == 2)
 	{
@@ -158,18 +158,18 @@ void bi_show(bigint* x, char base)
 	}
 	else if (base == 16) //16진수일 경우
 	{
-		printf("0x ");
+		printf("0x");
 #if (WORD_BITLEN == 8)
 		for (i = wordLen - 1; i >= 0; i--) {
-			printf("%02x ", x->a[i]);
+			printf("%02x", x->a[i]);
 		}
 #elif (WORD_BITLEN == 32)
 		for (i = wordLen - 1; i >= 0; i--) {
-			printf("%08x ", x->a[i]);
+			printf("%08x", x->a[i]);
 		}
 #elif (WORD_BITLEN == 64)
 		for (i = wordLen - 1; i >= 0; i--) {
-			printf("%016llx ", x->a[i]);
+			printf("%016llx", x->a[i]);
 		}
 #endif
 	}
@@ -181,7 +181,7 @@ void bi_show(bigint* x, char base)
 			num ^= ((x->a[i]) << (8 * sizeof(word) * i));
 		printf("%u", num);
 	}
-	printf("\n");
+	//printf("\n");
 }
 
 int bi_refine(bigint* x)	//Remove Last Zero Words
@@ -189,7 +189,8 @@ int bi_refine(bigint* x)	//Remove Last Zero Words
 	if (x == NULL)
 		return ERROR;
 
-	word* p = (x->a);
+	word* p = NULL;
+	p = (x->a);
 	int new_wordLen = x->wordLen;
 
 	while (new_wordLen > 1)	//at least one word needed
@@ -357,9 +358,9 @@ void bi_set_zero(bigint** x)	//create big num 0
 	(*x)->a[0] = 0x0;
 }
 
-int Is_Zero(bigint* x)	//Is_Zero -> 1(TRUE),	Is_Not_Zero -> 0(FALSE)
+int Is_Zero(bigint* x)	//x == 0 -> 1(TRUE),	x != 0 -> 0(FALSE)
 {
-	if ((x->sign == 1) || (x->a[0] != 0))
+	if ((x->sign == 1) | (x->a[0] != 0))
 		return FALSE;
 
 	int i = 0;
@@ -370,9 +371,23 @@ int Is_Zero(bigint* x)	//Is_Zero -> 1(TRUE),	Is_Not_Zero -> 0(FALSE)
 
 	return TRUE;
 }
-int Is_One(bigint* x)	//Is_One -> 1(TRUE),	Is_Not_Zero -> 0(FALSE)
+int Is_One(bigint* x)	//x == 1 -> 1(TRUE),	x != 1 -> 0(FALSE)
 {
-	if ((x->sign == 1) || (x->a[0] != 1))
+	if ((x->sign == 1) | (x->a[0] != 1))
+		return FALSE;
+
+	int i = 0;
+	int wordLen = x->wordLen;
+	for (i = wordLen - 1; i >= 0; i--)
+		if (x->a[i] != 1)
+			return FALSE;
+
+	return TRUE;
+}
+
+int Is_NegativeOne(bigint* x)	//x == -1 -> 1(TRUE),	x != -1 -> 0(FALSE)
+{
+	if ((x->sign == 0) || (x->a[0] != 1))
 		return FALSE;
 
 	int i = 0;
@@ -424,7 +439,8 @@ int Compare(bigint* A, bigint* B) //절댓값 크기 비교: 1(A>B) or -1(A<B) or 0(A=B
 
 void Left_shift(bigint** x, int r) //A << r   
 {
-	word* p = (*x)->a;
+	word* p = NULL;
+	p = (*x)->a;
 
 	int k = 0, rr = 0, new_wordlen = 0, i;
 
@@ -443,8 +459,7 @@ void Left_shift(bigint** x, int r) //A << r
 	//Case 1: r = wk
 	if (rr == 0) {
 		new_wordlen = (*x)->wordLen + k;
-
-		word* temp;
+		word* temp = NULL;
 		temp = (word*)realloc(p, sizeof(word) * new_wordlen);
 		if (temp != NULL) {
 			p = temp;
@@ -462,7 +477,7 @@ void Left_shift(bigint** x, int r) //A << r
 	{
 		new_wordlen = ((*x)->wordLen + (k + 1));
 
-		word* temp;
+		word* temp = NULL;
 		temp = (word*)realloc(p, sizeof(word) * new_wordlen);
 		if (temp != NULL) {
 			p = temp;
@@ -509,7 +524,6 @@ void Right_shift(bigint** x, int r) //A >> r
 		{
 			array_copy((*x)->a, (*x)->a + k, (*x)->wordLen - k); //(A_n-k-1,..., A_0) <- (A_n-1,..., A_k+1, A_k)
 			array_init((*x)->a + (*x)->wordLen - k, k); //(A_n-1,..., A_n-k) <- (0, 0,..., 0)
-
 		}
 		else if (rr > 0) //r = wk + rr
 		{

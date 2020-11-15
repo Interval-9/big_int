@@ -1,102 +1,125 @@
 #include "bn_struct.h"
+#include "test_setting.h"
+#include "Basic_Oper_test.h"
+#include "Add_Sub_test.h"
+#include "Mul_test.h"
+
+#include <time.h>
 
 int main()
 {
-	//bigint* A = NULL;
-	//bigint* B = NULL;
-	//bigint* C = NULL;
-	//bigint* D = NULL;
+	/*
+		테스트할 bignum을 랜덤으로 생성 
+		(테스트하고 싶은 횟수는 "test_setting.h" -> TestNum)
+		(배열의 최대 길이는 "test_setting.h" -> MaxArrNum)
 
-	//int sign_1 = Non_Negative;
-	//int sign_2 = Negative;
+		//주석은 배열길이가 고정되었을 때의 테스트코드
+	*/
 
-	//word arr[4] = { 0x00,0x00,0x1f,0x00 };
-	//char* str_1 = "12f";
-	//char* str_2 = "000100101111";
+	int i = 0, j = 0;
+	int t = 0;
 
-	//int wordLen = sizeof(arr) / sizeof(arr[0]);
-	//bi_set_by_array(&A, sign_1, arr, wordLen);
-	//bi_set_by_array(&B, sign_2, arr, wordLen);
+	clock_t tm_start, tm_end;
 
-	//bi_set_by_string(&C, sign_1, str_1, 16);
-	//bi_set_by_string(&D, sign_2, str_2, 2);
+	srand((unsigned int)time(NULL));
 
-	//printf("\n****array to bigint test****\n");
-	//bi_show(A, 16);   //0x 1f 00 00
-	//bi_show(B, 2);   //- 0b 00011111 00000000 00000000
+	for (t = 0; t < TestNum; t++) {
+		bigint* A = NULL;
+		bigint* B = NULL;
+		bigint* C = NULL;
 
-	//printf("\n****string to bigint test****\n");
-	//bi_show(C, 2);   //0b 00000001 00101111
-	//bi_show(D, 16);   //- 0x 01 2f
-	//bi_show(D, 10);   //- 0d 303
+		int sign[2] = { Non_Negative, Negative };
 
-	//printf("\n****array init test****\n");
-	//array_init(D->a, D->wordLen);
-	//bi_show(D, 16);   //- 0x 00 00
+		int arr1Num = 400;//(rand() % MaxArrNum) + 1;	//rand(): 최대 15비트
+		int arr2Num = 400;//(rand() % MaxArrNum) + 1;
 
-	//printf("\n****array copy test****\n");
-	//array_copy(D->a, C->a, C->wordLen);
-	//bi_show(D, 16);   //- 0x 01 2f
+		//int arr1Num = 2;
+		//int arr2Num = 3;
+		//
+		//word arr1[2] = { 0xbe, 0x84 };
+		//word arr2[3] = { 0xe1,0x6c,0xd6 };
 
-	//printf("\n****bigint copy test****\n");
-	//bi_assign(&D, A);
-	//bi_show(D, 16);   //0x 1f 00 00
+		//word arr1[2] = { 0xbebe, 0x8484 };
+		//word arr2[3] = { 0xe1e1,0x6c6c,0xd6d6 };
 
-	//printf("\n****random array test****\n");
-	//array_rand(D->a, D->wordLen);
-	//bi_show(D, 16);   //0x be 23 29
+		word* arr1 = NULL;
+		word* arr2 = NULL;
 
-	//printf("\n****random bigint test****\n");
-	//bi_gen_rand(&D, sign_2, D->wordLen);
-	//bi_show(D, 16);   //- 0x 6c e1 84
+		arr1 = (word*)calloc(arr1Num, sizeof(word));
+		if (arr1 == NULL)
+			return -1;
+		arr2 = (word*)calloc(arr2Num, sizeof(word));
+		if (arr2 == NULL)
+			return -1;
 
-	//printf("\n****get word/bit length, jth bit test****\n");
-	//wordLen = get_word_length(A);
-	//int bitLen = get_bit_length(A);
-	//int j_bit = get_jth_bit_of_bi(A, 4);
-	//printf("%d -- %d -- %d\n", wordLen, bitLen, j_bit);   //3 -- 21 -- 1
+#if WORD_BITLEN == 8
+		for (i = 0; i < arr1Num; i++)
+			arr1[i] = rand() % 0x100;
+		for (i = 0; i < arr2Num; i++)
+			arr2[i] = rand() % 0x100;
 
-	//printf("\n****flip bigint sign test****\n");
-	//int sign = get_bi_sign(D);
-	//flip_bi_sign(D);
-	//printf("original sign: %d\n", sign);   //original sign:1 (Negative)
-	//bi_show(D, 16);   //0x 6c e1 84 (Non-Negative로 바뀜)
+#elif WORD_BITLEN == 32
+		for (i = 0; i < arr1Num; i++)
+			arr1[i] = (rand() << 17) | (rand() << 2) | rand() % 0x4;
+		for (i = 0; i < arr2Num; i++)
+			arr2[i] = (rand() << 17) | (rand() << 2) | rand() % 0x4;
 
-	//printf("\n****set one test****\n");
-	//bi_set_one(&D);
-	//bi_show(D, 16);   //0x 01
+#elif WORD_BITLEN == 64
+		for (i = 0; i < arr1Num; i++)
+			arr1[i] = (rand() << 49) | (rand() << 34) | (rand() << 19) | (rand() << 4) | (rand() % 0x100);
+		for (i = 0; i < arr2Num; i++)
+			arr2[i] = (rand() << 49) | (rand() << 34) | (rand() << 19) | (rand() << 4) | (rand() % 0x100);
+#endif
 
-	//printf("\n****set zero test****\n");
-	//bi_set_zero(&D);
-	//bi_show(D, 16);   //0x 00
+		/////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////
 
-	//printf("\n****Is_zero, Is_one test****\n");
-	//int ret_1 = Is_Zero(D);
-	//int ret_2 = Is_One(D);
-	//printf("%d -- %d\n", ret_1, ret_2);   //1(True) -- 0(False)
+		//printf("\n############ Basic_Oper_test ############\n");
+		//basic_operation_test(); printf("\n");
 
-	//printf("\n****compare test****\n");
-	//ret_1 = CompareABS(A, B);
-	//ret_2 = Compare(A, C);
-	//printf("%d -- %d\n", ret_1, ret_2);   //0(A==B) -- 1(A>C)
+		//printf("\n############ ADD_test ############\n");
+		//for (i = 0; i < 2; i++) {
+		//	for (j = 0; j < 2; j++) {
+		//		bi_set_by_array(&A, sign[i], arr1, arr1Num);
+		//		bi_set_by_array(&B, sign[j], arr2, arr2Num);
 
-	//int r = 9;
-	//printf("\n****Left_shift test****\n");
-	//Left_shift(&A, r);
-	//bi_show(A, 16);   //0x 3e 00 00 00
+		//		ADD_test(A, B, C);
+		//	}
+		//}
 
-	//printf("\n****Right_shift test****\n");
-	//bi_show(A, 16);	//0x 3e 00 00 00
-	//Right_shift(&A, r);
-	//bi_show(A, 16);	//0x 1f 00 00
+		//printf("\n############ SUB_test ############\n");
+		//for (i = 0; i < 2; i++) {
+		//	for (j = 0; j < 2; j++) {
+		//		bi_set_by_array(&A, sign[i], arr1, arr1Num);
+		//		bi_set_by_array(&B, sign[j], arr2, arr2Num);
 
-	//printf("\n****Reduction test****\n");
-	//bi_show(A, 16);	//0x 1f 00 00
-	//Reduction(&A, 10);
-	//bi_show(A, 16);	//0x 00
+		//		SUB_test(A, B, C);
+		//	}
+		//}
 
-	SUB_test();
-	ADD_test();
+		printf("\n############ MUL_test ############\n");
+		for (i = 0; i < 2; i++) {
+			for (j = 0; j < 2; j++) {
+				bi_set_by_array(&A, sign[i], arr1, arr1Num);
+				bi_set_by_array(&B, sign[j], arr2, arr2Num);
 
+				if ((i == 0) & (j == 0))
+					tm_start = clock();
+				MUL_test(A, B, C);
+				if ((i == 0) & (j == 0)) {
+					tm_end = clock();
+					printf("##Time during Multiple Operation(%d, %d wordLen): %.3lf초##\n", arr1Num, arr2Num, (double)(tm_end - tm_start) / 1000);
+				}
+			}
+		}
+
+		free(A);
+		free(B);
+		free(C);
+		free(arr1);
+		free(arr2);
+	}
 	return 0;
 }

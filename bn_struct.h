@@ -10,6 +10,8 @@
 //#define ZERORIZE
 
 #define	WORD_BITLEN		8	//8, 32, 64
+#define MUL_Type		2	//0: Schoolbook Mul, 1: Modfied Schoolbook Mul,	2: Karatsuba
+#define	FLAG			3
 
 #define	Negative		1
 #define	Non_Negative	0
@@ -23,9 +25,12 @@
 
 #if WORD_BITLEN == 8
 typedef	unsigned char	word;
+#define MASK 0xf
 #elif	WORD_BITLEN == 32
 typedef	unsigned int	word;
+#define MASK 0xffff
 #else	//WORD_BITLEN == 64
+#define MASK 0xffffffff
 typedef	unsigned long long	word;
 #endif	//WORD_BITLEN == 8
 
@@ -66,6 +71,7 @@ void bi_set_zero(bigint** x);
 
 int Is_Zero(bigint* x);
 int Is_One(bigint* x);
+int Is_NegativeOne(bigint* x);
 
 int CompareABS(bigint* A, bigint* B);
 int Compare(bigint* A, bigint* B);
@@ -82,6 +88,9 @@ int SUB_AbB(word* Cj, word Aj, int bb, word Bj);
 int SUBC(bigint** C, bigint* A, bigint* B);
 int SUB(bigint** C, bigint* A, bigint* B);
 
-void ADD_test();
-void SUB_test();
+void MUL_AB(word* Cj, word Aj, word Bi);
+int MULC_S(bigint** C, bigint* A, bigint* B);
+int Modified_MULC_S(bigint** C, bigint* A, bigint* B);
+int MULC_K(bigint** C, bigint* A, bigint* B);
+int MUL(bigint** C, bigint* A, bigint* B);
 #endif // !_BN_STURCT_H_
