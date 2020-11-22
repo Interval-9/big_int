@@ -4,6 +4,6 @@
 #include "bn_struct.h"
 
 #define TestNum		5
-#define	MaxArrNum	400
+#define	MaxArrNum	100
 
 #endif // !_ADD_SUB_TEST_H_

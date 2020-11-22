@@ -15,11 +15,11 @@ void MUL_AB(word* Cj, word Aj, word Bi)
 
 	//A1, A0 <- Aj >> w/2, Aj mod 2^(w/2)
 	A1 = Aj >> Half_bitLen;
-	A0 = Aj & MASK;											
+	A0 = Aj & HARF_MASK;
 
 	//B1, B0 <- Bi >> w/2, Bi mod 2^(w/2)
 	B1 = Bi >> Half_bitLen;
-	B0 = Bi & MASK;
+	B0 = Bi & HARF_MASK;
 
 	/*
 		T1W + T0 = A1*B0 + A0*B1
@@ -63,8 +63,6 @@ int MULC_S(bigint** C, bigint* A, bigint* B)
 	int max_wordLen = 0;
 	int i = 0, j = 0;
 
-	//word* temp = NULL;
-
 	bigint* T = NULL;
 	bigint* tempC = NULL;
 
@@ -76,18 +74,19 @@ int MULC_S(bigint** C, bigint* A, bigint* B)
 	max_wordLen = n + m;		//Compute maximum wordlen of C
 	if (-1 == bi_new(&tempC, max_wordLen)) //fail in dynamic allocation
 		return ERROR;
-	//array_init(tempC->a, max_wordLen);
 
-	for (j = 0; j < n; j++) {
-		//A와 B의 각 워드를 곱할 임시 bignum 구조체 T 생성
-		for (i = 0; i < m; i++) {
+	for (j = 0; j < n; j++) 
+	{
+		//Define temporary bigint structure T to store result of multiplication of A_j and B_i
+		for (i = 0; i < m; i++) 
+		{
 			if (bi_new(&T, sizeof(word) * 2) == -1)
 				return ERROR;
 			/*
 				1)	T <- A_j * B_i
 				2)	T <- T << w(i+j)
 			*/
-			//1) 0 <= T < W^2
+			//1)
 			MUL_AB(T->a, A->a[j], B->a[i]);
 			//2)
 			Left_shift(&T, WORD_BITLEN * (i + j));
@@ -101,7 +100,6 @@ int MULC_S(bigint** C, bigint* A, bigint* B)
 	}
 	bi_refine(*C);
 
-	//free(temp);
 	bi_delete(&T);
 	bi_delete(&tempC);
 	return 0;
@@ -187,70 +185,72 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 	int L = 0;
 	int i = 0, j = 0;
 	int max_wordLen = 0;
+	int new_sign = 0;
 
 	bigint* A1 = NULL; bigint* A0 = NULL;
 	bigint* B1 = NULL; bigint* B0 = NULL;
 	bigint* T1 = NULL; bigint* T0 = NULL; bigint* tempT1 = NULL;
-	bigint* R = NULL;
+	bigint* R = NULL; bigint* tempR = NULL;
 	bigint* S1 = NULL; bigint* S0 = NULL; bigint* S = NULL; bigint* tempS = NULL;
 
-	//n: wordlen of A, m: wordlen of B					
-	//n = get_bit_length(A) / WORD_BITLEN;
-	//m = get_bit_length(B) / WORD_BITLEN;
+	//n: wordlen of A, m: wordlen of B
 	n = A->wordLen;
 	m = B->wordLen;
+	//n = (get_bit_length(A) / WORD_BITLEN) + 1;
+	//m = (get_bit_length(B) / WORD_BITLEN) + 1;
+	//printf("n, m, min(n,m): %d, %d, %d\n", n, m, min(n,m));
 
 	if (FLAG >= min(n, m))
-	{
-		if (-1 == MULC_S(C, A, B))
-			return ERROR;
-		else
-			return 0;
-	}
+		return Modified_MULC_S(C, A, B);// MULC_S(C, A, B);		///////////////////////////////////////////////////////////////
 
 	L = (max(n, m) + 1) >> 1;
+	//printf("L: %d\n", L);
 
 	/*
 		1)	A1, A0 <- A >> lw, A mod(2^lw)
 		2)	B1, B0 <- B >> lw, B mod(2^lw)
 	*/
-	//define new A1, A0, B1, B0 bigint structure
-	if (-1 == bi_new(&A1, A->wordLen))
-		return ERROR;
-	if (-1 == bi_new(&A0, A->wordLen))
-		return ERROR;
-	if (-1 == bi_new(&B1, B->wordLen))
-		return ERROR;
-	if (-1 == bi_new(&B0, B->wordLen))
-		return ERROR;
 	//1)
-	array_copy(A1->a, A->a, A->wordLen);
-	array_copy(A0->a, A->a, A->wordLen);
+	bi_assign(&A1, A);
+	bi_assign(&A0, A);
 	Right_shift(&A1, L * WORD_BITLEN);
 	Reduction(&A0, L * WORD_BITLEN);
+
+	//printf("A1: "); bi_show(A1, 16); printf("\n");
+	//printf("A0: "); bi_show(A0, 16); printf("\n");
+
 	//2)
-	array_copy(B1->a, B->a, B->wordLen);
-	array_copy(B0->a, B->a, B->wordLen);
+	bi_assign(&B1, B);
+	bi_assign(&B0, B);
 	Right_shift(&B1, L * WORD_BITLEN);
 	Reduction(&B0, L * WORD_BITLEN);
+
+	//printf("B1: "); bi_show(B1, 16); printf("\n");
+	//printf("B0: "); bi_show(B0, 16); printf("\n");
 
 	/*
 		1)	T1, T0 <- MULC_K(A1, B1), MULC_K(A0, B0)
 		2)	R <- T1 || T0
 	*/
 	//1)
+	//printf("== A1*B1 ==\n");
 	if (-1 == MULC_K(&T1, A1, B1))
 		return ERROR;
+	//printf("T1: "); bi_show(T1, 16); printf("\n");
+
+	//printf("== A0*B0 ==\n");
 	if (-1 == MULC_K(&T0, A0, B0))
 		return ERROR;
+	//printf("T0: "); bi_show(T0, 16); printf("\n");
+
 	//2) R <- (T1 << 2lw) + T0
-	/*if (-1 == bi_new(&tempT1, T1->wordLen))
-		return ERROR;
-	array_copy(tempT1->a, T1->a, T1->wordLen);*/
 	bi_assign(&tempT1, T1);
 	Left_shift(&tempT1, 2 * L * WORD_BITLEN);
-	if (-1 == ADD(&R, tempT1, T0))
+	//printf("tempT1 << 2lw: "); bi_show(tempT1, 16); printf("\n");
+
+	if (-1 == ADD(&tempR, tempT1, T0))
 		return ERROR;
+	//printf("tempR: "); bi_show(tempR, 16); printf("\n");
 
 	/*
 		1)	S1, S0 <- A0 - A1, B1 - B0
@@ -259,12 +259,17 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 	//1)
 	if (-1 == SUB(&S1, A0, A1))
 		return ERROR;
+	//printf("S1: "); bi_show(S1, 16); printf("\n");
 	if (-1 == SUB(&S0, B1, B0))
 		return ERROR;
+	//printf("S0: "); bi_show(S0, 16); printf("\n");
 	//2)
-	if (-1 == MULC_K(&S, S1, S0))
+	new_sign = (S1->sign) ^ (S0->sign);
+	S1->sign = 0; S0->sign = 0;		//|S1|, |S0|
+	if (-1 == MULC_K(&tempS, S1, S0))
 		return ERROR;
-	S->sign = (S1->sign) ^ (S0->sign);
+	tempS->sign = new_sign;
+	//printf("tempS: "); bi_show(tempS, 16); printf("\n");
 
 	/*
 		R + S
@@ -274,21 +279,27 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 		4)	R <- ADD(R, S)
 	*/
 	//1)
-	if (-1 == ADD(&tempS, S, T1))
+	if (-1 == ADD(&S, tempS, T1))
 		return ERROR;
+	//printf("S: "); bi_show(S, 16); printf("\n");
 	//2)
-	if (-1 == ADD(&S, tempS, T0))
+	if (-1 == ADD(&tempS, S, T0))
 		return ERROR;
+	//printf("S: "); bi_show(tempS, 16); printf("\n");
 	//3)
-	Left_shift(&S, L * WORD_BITLEN);
+	Left_shift(&tempS, L * WORD_BITLEN);
+	//printf("S: "); bi_show(tempS, 16); printf("\n");
 	//4)
-	if (-1 == ADD(C, R, S))
+	if (-1 == ADD(C, tempR, tempS))
 		return ERROR;
+	//printf("R: "); bi_show(*C, 16); printf("\n");
 
+	//bi_assign(C, R);
 	bi_refine(*C);
+	//printf("C: "); bi_show(*C, 16); printf("\n");
 
-	bi_delete(&A0); bi_delete(&A1); bi_delete(B0); bi_delete(B1); 
-	bi_delete(&T0); bi_delete(&T1); bi_delete(&tempT1); bi_delete(&R);
+	bi_delete(&A0); bi_delete(&A1); bi_delete(&B0); bi_delete(&B1); 
+	bi_delete(&T0); bi_delete(&T1); bi_delete(&tempT1); bi_delete(&R); bi_delete(&tempR);
 	bi_delete(&S0); bi_delete(&S1); bi_delete(&tempS); bi_delete(&S);
 	return 0;
 }
@@ -300,6 +311,8 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 */
 int MUL(bigint** C, bigint* A, bigint* B)
 {
+	int sign_A = 0, sign_B = 0;
+
 	//if A = 0 or B = 0, then C <- 0
 	if ((Is_Zero(A) == 1) | (Is_Zero(B) == 1)) 
 	{
@@ -333,21 +346,22 @@ int MUL(bigint** C, bigint* A, bigint* B)
 		(*C)->sign = (A->sign) ^ (B->sign);
 		return 0;
 	}
+	sign_A = (A->sign); sign_B = (B->sign);
+	A->sign = 0; B->sign = 0;
 
 #if MUL_Type == 0 //Schoolbook Mul
 	if (-1 == MULC_S(C, A, B))
 		return ERROR;
-	(*C)->sign = (A->sign) ^ (B->sign);
 
 #elif MUL_Type == 1//Modified Schoolbook Mul
 	if (-1 == Modified_MULC_S(C, A, B))
 		return ERROR;
-	(*C)->sign = (A->sign) ^ (B->sign);
 
 #elif MUL_Type == 2 //Karatsuba Mul
 	if (-1 == MULC_K(C, A, B))
 		return ERROR;
-	(*C)->sign = (A->sign) ^ (B->sign);
 #endif
+	(*C)->sign = sign_A ^ sign_B;
+	A->sign = sign_A; B->sign = sign_B;
 	return 0;
 }

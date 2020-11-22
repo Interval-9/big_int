@@ -9,8 +9,9 @@
 
 //#define ZERORIZE
 
-#define	WORD_BITLEN		8	//8, 32, 64
+#define	WORD_BITLEN		64	//8, 32, 64
 #define MUL_Type		2	//0: Schoolbook Mul, 1: Modfied Schoolbook Mul,	2: Karatsuba
+#define	SQU_Type		1	//0: Schoolbook Squ, 1: Karatsuba Squ
 #define	FLAG			3
 
 #define	Negative		1
@@ -25,12 +26,17 @@
 
 #if WORD_BITLEN == 8
 typedef	unsigned char	word;
-#define MASK 0xf
-#elif	WORD_BITLEN == 32
+#define MASK 0xff
+#define HARF_MASK 0xf
+#endif
+#if	WORD_BITLEN == 32
 typedef	unsigned int	word;
-#define MASK 0xffff
-#else	//WORD_BITLEN == 64
 #define MASK 0xffffffff
+#define HARF_MASK 0xffff
+#endif
+#if WORD_BITLEN == 64
+#define MASK 0xffffffffffffffff
+#define HARF_MASK 0xffffffff
 typedef	unsigned long long	word;
 #endif	//WORD_BITLEN == 8
 
@@ -83,6 +89,7 @@ void Reduction(bigint** x, int r);
 int ADD_ABc(word* Cj, word Aj, word Bj, int cb);
 int ADDC(bigint** C, bigint* A, bigint* B);
 int ADD(bigint** C, bigint* A, bigint* B);
+int Positive_ADD_1(bigint** X);
 
 int SUB_AbB(word* Cj, word Aj, int bb, word Bj);
 int SUBC(bigint** C, bigint* A, bigint* B);
@@ -93,4 +100,15 @@ int MULC_S(bigint** C, bigint* A, bigint* B);
 int Modified_MULC_S(bigint** C, bigint* A, bigint* B);
 int MULC_K(bigint** C, bigint* A, bigint* B);
 int MUL(bigint** C, bigint* A, bigint* B);
+
+int SQU_AB(bigint** C, word A);
+int SQUC_S(bigint** C, bigint* A);
+int SQUC_K(bigint** C, bigint* A);
+int SQU(bigint** C, bigint* A);
+
+int Compute_k(word b);
+void Long_Div_2word(word* Q, word* A, word* B);
+int DIVCC(word* Q, bigint** R, bigint* A, bigint* B);
+int DIVC(word* Q, bigint** R, bigint* A, bigint* B);
+int Long_Div(bigint** Q, bigint** R, bigint* A, bigint* B);
 #endif // !_BN_STURCT_H_

@@ -58,6 +58,33 @@ int ADDC(bigint** C, bigint* A, bigint* B)
 	return 0;
 }
 
+int Positive_ADD_1(bigint** X)
+{
+	int X_wordLen = (*X)->wordLen, j = 0, c1 = 1, c2 = 0;
+	word tmp = 0;
+	word* Xa = NULL;
+	Xa = (*X)->a;
+
+	for (j = 0; j < X_wordLen; j++)
+	{
+		tmp = (word)(*(Xa + j) + c1);
+		if (tmp < *(Xa + j))
+			c2 = 1;
+		
+		c1 = c2;
+		*(Xa + j) = tmp;
+	}
+
+	if (c2 == 1) //최상위 워드 연산 결과, 캐리가 남아있을 경우
+	{
+		Xa = (word*)realloc((*X)->a, X_wordLen + 1);
+		if (Xa == NULL)
+			return ERROR;
+		*((*X)->a + X_wordLen) = c2;
+		(*X)->wordLen = X_wordLen + 1;
+	}
+	return 0;
+}
 
 /*
 	> 두 정수 A, B의 합을 계산하는 함수

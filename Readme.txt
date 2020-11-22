@@ -57,10 +57,6 @@ int Modified_MULC_S(bigint** C, bigint* A, bigint* B)
 - Schoolbook 곱셈 연산을 수행
 - 연산의 성공 여부를 반환함 (성공시 0, 실패시 -1)
 
-**MULC_S와 Modified_MULC_S 비교
-- (반복문 수행 횟수) MULC_S: nm번 / Modified_MULC_S: nm/2번
-- (메모리) MULC_S: bigint 구조체 2개 / Modified_MULC_S: bigint 구조체 3개
-
 int MULC_K(bigint** C, bigint* A, bigint* B)
 - 두 양의 정수의 곱셈을 수행하는 함수
 - Karatsuba 곱셈 연산을 수행
@@ -71,7 +67,36 @@ int MUL(bigint** C, bigint* A, bigint* B)
 - A, B가 0, 1, -1인 경우와 아닌 경우를 나누어서 수행
 - MUL_Type에 따라서 MULC_S, Modified_MULC_S, MULC_K을 수행
 
+**MULC_S와 Modified_MULC_S 비교
+- (반복문 수행 횟수) MULC_S: nm번 / Modified_MULC_S: nm/2번
+- (메모리) MULC_S: bigint 구조체 2개 / Modified_MULC_S: bigint 구조체 3개
 
+
+********************** interval-9 Div.c **********************
+
+int Compute_k(word b)
+- 2^(w-1) <= 2^k * b < 2^w 을 만족하는 k을 계산하는 함수
+- 하나의 워드 b을 입력으로 받아서 k을 반환
+
+void Long_Div_2word(word* Q, word* A, word* B)
+- 2 워드 A(A1*W + A0)와 1 워드 B을 입력으로 받아서 A / B의 몫을 계산하는 함수
+- Binary long division 방법으로 연산을 수행
+- 계산한 몫을 저장할 주소, A0의 주소, B의 주소를 입력으로 받음
+
+int DIVCC(word* Q, bigint** R, bigint* A, bigint* B)
+- 2^(w-1) <= B < 2^w을 만족할 경우 A/B의 몫과 나머지를 계산하는 함수
+- 계산한 몫(1 word), 나머지(bigint 구조체)를 저장할 주소, bigint 구조체 A, B을 입력으로 받음
+- 성공시 0, 실패시 -1을 반환
+
+int DIVC(word* Q, bigint** R, bigint* A, bigint* B)
+- 2^(w-1) <= B < 2^w을 만족하도록 A', B'을 계산한 후 A'/B'의 몫 Q'과 나머지 R'을 계산하는 함수
+- 계산한 몫(1 word), 나머지(bigint 구조체)를 저장할 주소, bigint 구조체 A, B을 입력으로 받음
+- 성공시 0, 실패시 -1을 반환
+
+int Long_Div(bigint** Q, bigint** R, bigint* A, bigint* B)
+- Word 단위 나눗셈 연산을 이용해서 A/B의 몫과 나머지를 계산하는 함수
+- 계산한 몫과 나머지를 저장할 bigint 구조체의 주소, bigint 구조체 A, B을 입력으로 받음
+- 성공시 0, 실패시 -1을 반환
 
 
 
