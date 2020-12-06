@@ -1,8 +1,12 @@
+/*
+	This file contains the multiplication function, one of the main functions, and other functions necessary to implement the multiplication function.
+*/
 #include "bn_struct.h"
 /*
 	> Single-Precision Multiplication
 	> Multiplying two words (Aj * Bi = Cj)
-	> Success: return 0, Failure: return -1
+	> Input: address of word Cj, a word Aj, a word Bj
+	> Output: None
 */
 void MUL_AB(word* Cj, word Aj, word Bi)
 {
@@ -53,59 +57,77 @@ void MUL_AB(word* Cj, word Aj, word Bi)
 }
 
 /*
-	> SchoolBook Multiplication
-	> Multiplying two positive integers
-	> Success: return 0, Failure: return -1
+	> Multiplication: C <- A * B (A: bigint, B: word)
+	> Multiplying a big integer by a word
+	> Input: doulbe pointer of C, pointer of A, pointer of B
+	> Output: None
 */
-int MULC_S(bigint** C, bigint* A, bigint* B)
+void MUL_word_bigint(bigint** C, bigint* A, word B)
 {
-	int n = 0, m = 0;
-	int max_wordLen = 0;
-	int i = 0, j = 0;
+	int j = 0, n = 0, t = 0;
+	bigint* T1 = NULL; bigint* T2 = NULL;
+	word* pT1 = NULL; word* pT2 = NULL;
 
-	bigint* T = NULL;
-	bigint* tempC = NULL;
+	n = A->wordLen;
+	bi_new(C, n + 1);
+	bi_new(&T1, n + 1);
+	bi_new(&T2, n + 1);
+	pT1 = T1->a; pT2 = T2->a; //starting address of array
 
-	//n: wordlen of A, m: wordlen of B
+	t = n >> 1; //(A->wordLen)/2
+
+	for (j = 0;j < t;j++)
+	{
+		MUL_AB(pT1 + (unsigned long long)2 * j, A->a[2 * j], B);
+		MUL_AB(pT2 + (unsigned long long)2 * j + 1, A->a[2 * j + 1], B);
+	}
+	if (n & 1)
+	{
+		MUL_AB(pT1 + n - 1, A->a[n - 1], B);
+	}
+	ADD(C, T1, T2);
+	bi_delete(&T1);
+	bi_delete(&T2);
+}
+
+/*
+   > SchoolBook Multiplication: C <- A * B
+   > Multiplying two positive integers
+   > Input: doulbe pointer of C, pointer of A, pointer of B
+   > Output: None
+*/
+void MULC_S(bigint** C, bigint* A, bigint* B)
+{
+	int j = 0, k = 0, n = 0, m = 0;
+	word TMP[2] = { 0, 0 };
+	bigint* T1 = NULL; bigint* T2 = NULL;
 	n = A->wordLen;
 	m = B->wordLen;
 
-	//C <- 0
-	max_wordLen = n + m;		//Compute maximum wordlen of C
-	if (-1 == bi_new(&tempC, max_wordLen)) //fail in dynamic allocation
-		return ERROR;
-
-	for (j = 0; j < n; j++) 
+	bi_new(C, n + m);
+	for (j = 0; j < n; j++)
 	{
-		//Define temporary bigint structure T to store result of multiplication of A_j and B_i
-		for (i = 0; i < m; i++) 
+		for (k = 0; k < m; k++)
 		{
-			if (bi_new(&T, sizeof(word) * 2) == -1)
-				return ERROR;
-			/*
-				1)	T <- A_j * B_i
-				2)	T <- T << w(i+j)
-			*/
-			//1)
-			MUL_AB(T->a, A->a[j], B->a[i]);
-			//2)
-			Left_shift(&T, WORD_BITLEN * (i + j));
-
-			//C <- ADDC(C, T)
-			if (ADDC(C, tempC, T) == -1)
-				return ERROR;
-				
-			array_copy(tempC->a, (*C)->a, (*C)->wordLen);
+			MUL_AB(TMP, A->a[j], B->a[k]);
+			bi_set_by_array(&T1, Non_Negative, TMP, 2);
+			Left_shift(&T1, WORD_BITLEN * (j + k));
+			bi_assign(&T2, *C);
+			ADD(C, T2, T1);
 		}
 	}
 	bi_refine(*C);
-
-	bi_delete(&T);
-	bi_delete(&tempC);
-	return 0;
+	bi_delete(&T1);
+	bi_delete(&T2);
 }
 
-int Modified_MULC_S(bigint** C, bigint* A, bigint* B) //Modified version
+/*
+	> Modified SchoolBook Multiplication: C <- A * B
+	> Multiplying two positive integers
+	> Input: doulbe pointer of C, pointer of A, pointer of B
+	> Output: None
+*/
+void Modified_MULC_S(bigint** C, bigint* A, bigint* B)
 {
 	int j = 0, k = 0, n = 0, m = 0, t = 0;
 	bigint* T1 = NULL; bigint* T2 = NULL; bigint* T3 = NULL;
@@ -116,30 +138,25 @@ int Modified_MULC_S(bigint** C, bigint* A, bigint* B) //Modified version
 	t = ((B->wordLen) >> 1);
 
 	//define new bigint structure
-	if (-1 == bi_new(C, n + m))
-		return ERROR;
+	bi_new(C, n + m);
 
 	if (m & 1) //if m is odd
 	{
 		for (j = 0; j < n; j++)
 		{
-			if (-1 == bi_new(&T1, n + m))
-				return ERROR;
-			if (-1 == bi_new(&T2, n + m))
-				return ERROR;
+			bi_new(&T1, n + m);
+			bi_new(&T2, n + m);
 			pT1 = T1->a; pT2 = T2->a; //starting address of array
 
 			for (k = 0; k < t; k++)
 			{
-				MUL_AB(pT1 + 2 * k + j, A->a[j], B->a[2 * k]);          //T1 <- ...|| AjB4 || AjB2 || AjB0
-				MUL_AB(pT2 + 2 * k + j + 1, A->a[j], B->a[2 * k + 1]);  //T2 <- ...|| AjB5 || AjB3 || AjB1
+				MUL_AB(pT1 + (unsigned long long)2 * k + j, A->a[j], B->a[2 * k]);         //T1 <- ...|| AjB4 || AjB2 || AjB0
+				MUL_AB(pT2 + (unsigned long long)2 * k + j + 1, A->a[j], B->a[2 * k + 1]);  //T2 <- ...|| AjB5 || AjB3 || AjB1
 			}
-			MUL_AB((pT1 + 2 * t + j), A->a[j], B->a[2 * t]);
+			MUL_AB((pT1 + (unsigned long long)2 * t + j), A->a[j], B->a[2 * t]);
 
-			if (-1 == ADD(&T3, T1, T2))	//T3 <- ...|| (AjB5 + AjB4) || (AjB3 + AjB2) || (AjB1 + AjB0)
-				return ERROR;
-			if (-1 == ADD(&T2, (*C), T3))
-				return ERROR;
+			ADD(&T3, T1, T2);	//T3 <- ...|| (AjB5 + AjB4) || (AjB3 + AjB2) || (AjB1 + AjB0)
+			ADD(&T2, (*C), T3);
 			array_copy((*C)->a, T2->a, T2->wordLen);
 		}
 	}
@@ -147,39 +164,33 @@ int Modified_MULC_S(bigint** C, bigint* A, bigint* B) //Modified version
 	{
 		for (j = 0; j < n; j++)
 		{
-			if (-1 == bi_new(&T1, n + m))
-				return ERROR;
-			if (bi_new(&T2, n + m))
-				return ERROR;
+			bi_new(&T1, n + m);
+			bi_new(&T2, n + m);
 			pT1 = T1->a; pT2 = T2->a; //starting address of array
 
 			for (k = 0; k < t; k++)
 			{
-				MUL_AB(pT1 + 2 * k + j, A->a[j], B->a[2 * k]);         //T1 <- ...|| AjB4 || AjB2 || AjB0
-				MUL_AB(pT2 + 2 * k + j + 1, A->a[j], B->a[2 * k + 1]); //T2 <- ...|| AjB5 || AjB3 || AjB1
+				MUL_AB(pT1 + (unsigned long long)2 * k + j, A->a[j], B->a[2 * k]);         //T1 <- ...|| AjB4 || AjB2 || AjB0
+				MUL_AB(pT2 + (unsigned long long)2 * k + j + 1, A->a[j], B->a[2 * k + 1]); //T2 <- ...|| AjB5 || AjB3 || AjB1
 			}
-			if (-1 == ADD(&T3, T1, T2)) //C <- ...|| (AjB5 + AjB4) || (AjB3 + AjB2) || (AjB1 + AjB0)
-				return ERROR;
-			if (-1 == ADD(&T2, (*C), T3)) //T2 <- C + T3
-				return ERROR;
+			ADD(&T3, T1, T2); //C <- ...|| (AjB5 + AjB4) || (AjB3 + AjB2) || (AjB1 + AjB0)
+			ADD(&T2, (*C), T3); //T2 <- C + T3
 			array_copy((*C)->a, T2->a, T2->wordLen);
 		}
 	}
 	bi_refine(*C);
-
 	bi_delete(&T1);
 	bi_delete(&T2);
 	bi_delete(&T3);
-
-	return 0;
 }
 
 /*
-	> Karatsuba Multiplication
+	> Karatsuba Multiplication: C <- A * B
 	> Multiplying two positive integers
-	> Success: return 0, Failure: return -1
+	> Input: doulbe pointer of C, pointer of A, pointer of B
+	> Output: None
 */
-int MULC_K(bigint** C, bigint* A, bigint* B)
+void MULC_K(bigint** C, bigint* A, bigint* B)
 {
 	int n = 0, m = 0;
 	int L = 0;
@@ -194,17 +205,37 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 	bigint* S1 = NULL; bigint* S0 = NULL; bigint* S = NULL; bigint* tempS = NULL;
 
 	//n: wordlen of A, m: wordlen of B
-	n = A->wordLen;
-	m = B->wordLen;
-	//n = (get_bit_length(A) / WORD_BITLEN) + 1;
-	//m = (get_bit_length(B) / WORD_BITLEN) + 1;
-	//printf("n, m, min(n,m): %d, %d, %d\n", n, m, min(n,m));
+	n = get_bit_length(A)/WORD_BITLEN + 1;
+	m = get_bit_length(B) / WORD_BITLEN + 1;
 
-	if (FLAG >= min(n, m))
-		return Modified_MULC_S(C, A, B);// MULC_S(C, A, B);		///////////////////////////////////////////////////////////////
+	//if A = 0 or B = 0, then C <- 0
+	if ((Is_Zero(A) == 1) | (Is_Zero(B) == 1)) 
+	{
+		bi_set_zero(C);
+		return;
+	}
+
+	//if A = 1, then C <- B
+	else if (Is_One(A) == 1) 
+	{
+		bi_assign(C, B);
+		return;
+	}
+
+	//if B = 1, then C <- A
+	else if (Is_One(B) == 1) 
+	{
+		bi_assign(C, A);
+		return;
+	}
+
+	if (FLAG >= min(n, m)) 
+	{
+		Modified_MULC_S(C, A, B);
+		return;
+	}
 
 	L = (max(n, m) + 1) >> 1;
-	//printf("L: %d\n", L);
 
 	/*
 		1)	A1, A0 <- A >> lw, A mod(2^lw)
@@ -215,61 +246,37 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 	bi_assign(&A0, A);
 	Right_shift(&A1, L * WORD_BITLEN);
 	Reduction(&A0, L * WORD_BITLEN);
-
-	//printf("A1: "); bi_show(A1, 16); printf("\n");
-	//printf("A0: "); bi_show(A0, 16); printf("\n");
-
 	//2)
 	bi_assign(&B1, B);
 	bi_assign(&B0, B);
 	Right_shift(&B1, L * WORD_BITLEN);
 	Reduction(&B0, L * WORD_BITLEN);
 
-	//printf("B1: "); bi_show(B1, 16); printf("\n");
-	//printf("B0: "); bi_show(B0, 16); printf("\n");
-
 	/*
 		1)	T1, T0 <- MULC_K(A1, B1), MULC_K(A0, B0)
 		2)	R <- T1 || T0
 	*/
 	//1)
-	//printf("== A1*B1 ==\n");
-	if (-1 == MULC_K(&T1, A1, B1))
-		return ERROR;
-	//printf("T1: "); bi_show(T1, 16); printf("\n");
-
-	//printf("== A0*B0 ==\n");
-	if (-1 == MULC_K(&T0, A0, B0))
-		return ERROR;
-	//printf("T0: "); bi_show(T0, 16); printf("\n");
-
+	MULC_K(&T1, A1, B1); 
+	MULC_K(&T0, A0, B0);
 	//2) R <- (T1 << 2lw) + T0
 	bi_assign(&tempT1, T1);
 	Left_shift(&tempT1, 2 * L * WORD_BITLEN);
-	//printf("tempT1 << 2lw: "); bi_show(tempT1, 16); printf("\n");
-
-	if (-1 == ADD(&tempR, tempT1, T0))
-		return ERROR;
-	//printf("tempR: "); bi_show(tempR, 16); printf("\n");
+	ADD(&tempR, tempT1, T0);
 
 	/*
 		1)	S1, S0 <- A0 - A1, B1 - B0
 		2)	S <- (-1)^(S1->sign) ^ (S0->sign) * MULC_K(|S1|, |S0|)
 	*/
 	//1)
-	if (-1 == SUB(&S1, A0, A1))
-		return ERROR;
-	//printf("S1: "); bi_show(S1, 16); printf("\n");
-	if (-1 == SUB(&S0, B1, B0))
-		return ERROR;
-	//printf("S0: "); bi_show(S0, 16); printf("\n");
+	SUB(&S1, A0, A1);
+	SUB(&S0, B1, B0);
 	//2)
 	new_sign = (S1->sign) ^ (S0->sign);
 	S1->sign = 0; S0->sign = 0;		//|S1|, |S0|
-	if (-1 == MULC_K(&tempS, S1, S0))
-		return ERROR;
+
+	MULC_K(&tempS, S1, S0);
 	tempS->sign = new_sign;
-	//printf("tempS: "); bi_show(tempS, 16); printf("\n");
 
 	/*
 		R + S
@@ -279,89 +286,76 @@ int MULC_K(bigint** C, bigint* A, bigint* B)
 		4)	R <- ADD(R, S)
 	*/
 	//1)
-	if (-1 == ADD(&S, tempS, T1))
-		return ERROR;
-	//printf("S: "); bi_show(S, 16); printf("\n");
+	ADD(&S, tempS, T1);
 	//2)
-	if (-1 == ADD(&tempS, S, T0))
-		return ERROR;
-	//printf("S: "); bi_show(tempS, 16); printf("\n");
+	ADD(&tempS, S, T0);
 	//3)
 	Left_shift(&tempS, L * WORD_BITLEN);
-	//printf("S: "); bi_show(tempS, 16); printf("\n");
 	//4)
-	if (-1 == ADD(C, tempR, tempS))
-		return ERROR;
-	//printf("R: "); bi_show(*C, 16); printf("\n");
-
-	//bi_assign(C, R);
+	ADD(C, tempR, tempS);
 	bi_refine(*C);
-	//printf("C: "); bi_show(*C, 16); printf("\n");
 
 	bi_delete(&A0); bi_delete(&A1); bi_delete(&B0); bi_delete(&B1); 
 	bi_delete(&T0); bi_delete(&T1); bi_delete(&tempT1); bi_delete(&R); bi_delete(&tempR);
 	bi_delete(&S0); bi_delete(&S1); bi_delete(&tempS); bi_delete(&S);
-	return 0;
 }
 
 /*
-	> Multiplying two integers
+	> Multiplying two integers: C <- A * B
 	> Schoolbook(MUL_Type == 0) Karatsuba(MUL_Type == 1) (defined in "bn_struct.h")
-	> Success: return 0, Failure: return -1
+	> Input: doulbe pointer of C, pointer of A, pointer of B
+	> Output: None
 */
-int MUL(bigint** C, bigint* A, bigint* B)
+void MUL(bigint** C, bigint* A, bigint* B)
 {
 	int sign_A = 0, sign_B = 0;
 
 	//if A = 0 or B = 0, then C <- 0
-	if ((Is_Zero(A) == 1) | (Is_Zero(B) == 1)) 
-	{
+	if ((Is_Zero(A) == 1) | (Is_Zero(B) == 1)) {
 		bi_set_zero(C);
-		return 0;
+		return;
 	}
 
 	//if A = 1, then C <- B
-	else if(Is_One(A) == 1) 
-	{
+	else if (Is_One(A) == 1) {
 		bi_assign(C, B);
-		return 0;
+		return;
 	}
+
 	//if B = 1, then C <- A
-	else if (Is_One(B) == 1) 
-	{
+	else if (Is_One(B) == 1) {
 		bi_assign(C, A);
-		return 0;
+		return;
 	}
+
 	//if A = -1, then C <- -B
 	else if (Is_NegativeOne(A))
 	{
 		bi_assign(C, B);
 		(*C)->sign = (A->sign) ^ (B->sign);
-		return 0;
+		return;
 	}
+
 	//if B = -1, then C <- -A
 	else if (Is_NegativeOne(B))
 	{
 		bi_assign(C, A);
 		(*C)->sign = (A->sign) ^ (B->sign);
-		return 0;
+		return;
 	}
-	sign_A = (A->sign); sign_B = (B->sign);
+
+	sign_A = (A->sign);
+	sign_B = (B->sign);
 	A->sign = 0; B->sign = 0;
 
-#if MUL_Type == 0 //Schoolbook Mul
-	if (-1 == MULC_S(C, A, B))
-		return ERROR;
+#if MUL_Type == 0 //Modified Schoolbook Mul
+	Modified_MULC_S(C, A, B);
 
-#elif MUL_Type == 1//Modified Schoolbook Mul
-	if (-1 == Modified_MULC_S(C, A, B))
-		return ERROR;
-
-#elif MUL_Type == 2 //Karatsuba Mul
-	if (-1 == MULC_K(C, A, B))
-		return ERROR;
+#elif MUL_Type == 1 //Karatsuba Mul
+	MULC_K(C, A, B);
 #endif
 	(*C)->sign = sign_A ^ sign_B;
 	A->sign = sign_A; B->sign = sign_B;
-	return 0;
+
+	return;
 }

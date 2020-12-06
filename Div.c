@@ -1,3 +1,6 @@
+/*
+	This file contains the division function, one of the main functions, and other functions necessary to implement the division function.
+*/
 #include "bn_struct.h"
 
 /*
@@ -18,6 +21,7 @@ int Compute_k(word b)
 
 /*
 	> Compute the quotient of A divided by B (size of A(=A1*W + A0): 2 words, size of B: 1 word)
+	> A1 should be less than B
 	> Input: address of word A0, address of word B, address of word Q
 	> Output: None
 */
@@ -27,6 +31,7 @@ void Long_Div_2word(word* Q, word* A, word* B)
 	word R; //remainder of A divided by B
 	
 	(*Q) = 0; R = *(A + 1); //(Q, R) <- (0, A1)
+
 	for (j = WORD_BITLEN - 1;j >= 0;j--)
 	{
 		if (R >= ((word)1 << (WORD_BITLEN - 1))) //R >= 2^(w-1)
@@ -47,11 +52,11 @@ void Long_Div_2word(word* Q, word* A, word* B)
 }
 
 /*
-	> Compute quotient, Q and remainder, R of A divided by B with 2^(w-1) <= B < 2^w
+	> Compute quotient, Q and remainder, R of A divided by B with (2^(w-1)) <= B < (2^w)
 	> Input: address of word Q, double pointer of bigint structure R, pointer of bigint struture A, B
-	> Output: 0(Success) or -1(Failure)
+	> Output: None
 */
-int DIVCC(word* Q, bigint** R, bigint* A, bigint* B)
+void DIVCC(word* Q, bigint** R, bigint* A, bigint* B)
 {
 	int n = A->wordLen, m = B->wordLen; 
 	word* Aa = NULL; word* Ba = NULL; 
@@ -72,35 +77,30 @@ int DIVCC(word* Q, bigint** R, bigint* A, bigint* B)
 	}
 
 	//R <- A - BQ
-	bi_set_by_array(&Qtmp, Non_Negative, Q, 1);
-	if (-1 == MUL(&Btmp, B, Qtmp)) //Btmp <- B * Qtmp
-		return ERROR;
-	if (-1 == SUB(&Rtmp, A, Btmp)) //Rtmp <- A - B * Qtmp
-		return ERROR;
+	MUL_word_bigint(&Btmp, B, *Q);
+	SUB(&Rtmp, A, Btmp); //Rtmp <- A - B * Q
 
 	while (Rtmp->sign == Negative) //Rtmp < 0
 	{
 		(*Q) = (*Q) - 1; //Q <- Q - 1
-		if (-1 == ADD(R, B, Rtmp)) //R <- B + Rtmp
-			return ERROR;
+		ADD(R, B, Rtmp); //R <- B + Rtmp
 		bi_assign(&Rtmp, *R); //Rtmp <- R
 	}
 	bi_assign(R, Rtmp); //R <- Rtmp
 
 	bi_delete(&Qtmp); bi_delete(&Btmp); bi_delete(&Rtmp); //Delete temporary variable
-
-	return 0;
 }
 
 /*
 	> Compute A', B' st 2^(w-1) <= B' < 2^w and quotient, Q' and remainder, R' of A' divided by B'
 	> Input: address of word Q, double pointer of bigint structure R, pointer of bigint struture A, B
-	> Output: 0(Success) or -1(Failure)
+	> Output: None
 */
-int DIVC(word* Q, bigint** R, bigint* A, bigint* B)
+void DIVC(word* Q, bigint** R, bigint* A, bigint* B)
 {
 	int k = 0;
-	bigint* Atmp = NULL; bigint* Btmp = NULL;
+	bigint* Atmp = NULL; 
+	bigint* Btmp = NULL;
 
 	if (Compare(A, B) == -1) //A < B
 	{
@@ -109,7 +109,7 @@ int DIVC(word* Q, bigint** R, bigint* A, bigint* B)
 	}
 	else
 	{
-		k = Compute_k(*(B->a + B->wordLen - 1)); //Compute k such that 2 ^ (w - 1) <= 2 ^ k * b < 2 ^ w
+		k = Compute_k(*(B->a + B->wordLen - 1)); //Compute k such that (2 ^ (w - 1)) <= (2 ^ k * b) < (2 ^ w)
 
 		//Atmp <- 2^k * A, Btmp <- 2^k * B
 		bi_assign(&Atmp, A);
@@ -117,81 +117,159 @@ int DIVC(word* Q, bigint** R, bigint* A, bigint* B)
 		Left_shift(&Atmp, k);
 		Left_shift(&Btmp, k);
 
-		if (-1 == DIVCC(Q, R, Atmp, Btmp)) //(Q, Rtmp) <- DIVCC(Atmp, Btmp)
-			return ERROR;
+		DIVCC(Q, R, Atmp, Btmp); //(Q, Rtmp) <- DIVCC(Atmp, Btmp)
 		Right_shift(R, k); //R <- 2^(-k) * Rtmp
 	}
 	bi_delete(&Atmp); bi_delete(&Btmp); //Delete temporary variable
-	return 0;
 }
 
 /*
 	> Compute quotient, Q and remainder, R of A divided by B using Multi-Precision Long Division
 	> Input: double pointer of bigint structure Q and R, pointer of bigint structure A and B
-	> Output: 0(Success) or -1(Failure)
+	> Output: None
 */
-int Long_Div(bigint** Q, bigint** R, bigint* A, bigint* B)
+void Multi_Long_DIV(bigint** Q, bigint** R, bigint* A, bigint* B)
 {
-	int i, n = A->wordLen, m = B->wordLen; 
+	int i, n = A->wordLen, m = B->wordLen;
 	int sign_A = 0, sign_B = 0; 
 	int ret = 0; 
-	bigint* Rtmp = NULL; 
-
-	if (Is_Zero(B)) //B = 0
-		return ERROR;
-
-	else if (Is_One(B)) //B = 1
+	bigint* tempR = NULL; 
+	
+	if ((Is_Zero(B)) | (B->sign == 1)) //B <= 0
+		return;
+	
+	if (Is_One(B)) //B = 1
 	{
 		bi_assign(Q, A); //Q = A
 		bi_set_zero(R); //R = 0
-		return 0;
+		return;
 	}
+	
+	if (CompareABS(A, B) == -1) // A < B
+	{
+		bi_set_zero(Q);	//Q = 0
+		bi_assign(R, A); //R = A
+		return;
+	}
+	
+	bi_new(Q, n); //Q <- 0
+	bi_set_zero(R);	// R <- 0
+	for (i = n - 1; i >= 0; i--) 
+	{
+		/*
+			R <- R*W + A_i
+			1) R*W
+			2) R <- R + A_i
+		*/
+		//1)
+		Left_shift(R, WORD_BITLEN);
+		//2)
+		(*R)->a[0] = A->a[i];
 
-	else if (CompareABS(A, B) == -1) //|A| < |B|
+		//(Q_i,(temp)R) <- DIVC(R, B)
+		DIVC((*Q)->a + i, &tempR, *R, B);
+		bi_assign(R, tempR);
+	}
+	bi_refine(*Q);
+	bi_refine(*R);
+
+	bi_delete(&tempR);
+	return;
+}
+
+/*
+	> Compute quotient, Q and remainder, R of A divided by B using Binary Long Division
+	> Input: double pointer of bigint structure Q and R, pointer of bigint structure A and B
+	> Output: None
+*/
+void Binary_Long_DIV(bigint** Q, bigint** R, bigint* A, bigint* B)
+{
+	int j, n;
+	word aj = 0;
+	bigint* Rtmp = NULL;
+	bigint* Qtmp = NULL;
+	bigint* q = NULL;
+
+	n = (A->wordLen) * WORD_BITLEN;
+
+	//(Q, R) <- (0, 0)
+	bi_set_zero(Q);
+	bi_set_zero(R);
+
+	for (j = n - 1;j >= 0;j--)
+	{
+		//R <- 2R + aj
+		Left_shift(R, 1);
+		aj = get_jth_bit_of_bi(A, j);
+		(*R)->a[0] = ((*R)->a[0]) ^ aj;
+		
+		if ((Compare(*R, B) == 1) || (Compare(*R, B) == 0)) //R >= B
+		{
+			//R <- R - B
+			SUB(&Rtmp, *R, B);
+			bi_assign(R, Rtmp);
+			
+			bi_set_one(&q);
+			Left_shift(&q, j); //q <- 2^j
+
+			//Q <- Q + 2 ^ j
+			ADD(&Qtmp, *Q, q);
+			bi_assign(Q, Qtmp);
+		}
+	}
+	bi_delete(&Rtmp); bi_delete(&Qtmp); bi_delete(&q);
+}
+
+/*
+	> Compute quotient, Q and remainder, R of A divided by B using Naive Division
+	> Input: double pointer of bigint structure Q and R, pointer of bigint structure A and B
+	> Output: None
+*/
+void Naive_DIV(bigint** Q, bigint** R, bigint* A, bigint* B)
+{
+	bigint* Rtmp = NULL;
+
+	if ((B->sign) | (Is_Zero(B))) //B <= 0
+		return;
+
+	if (Compare(B, A) == 1) //A < B
 	{
 		bi_set_zero(Q); //Q = 0
 		bi_assign(R, A); //R = A
-		return 0;
+		return;
 	}
+	if (Is_One(B)) //B = 1
+	{
+		bi_assign(Q, A); //Q = A
+		bi_set_zero(R); //R = 0
+		return;
+	}
+	bi_set_zero(Q); //Q <- 0
+	bi_assign(R, A); // R <- A
+
 	
-	sign_A = A->sign; sign_B = B->sign;
-	A->sign = Non_Negative; B->sign = Non_Negative; //A <- |A|, B <- |B|
-
-	if (-1 == bi_new(Q, n - 1)) //Q <- 0
-		return ERROR;
-	if (-1 == bi_new(&Rtmp, 1)) //Rtmp <- 0
-		return ERROR;
-
-	for (i = n - 1;i >= 0;i--) //n = word length of A
+	while (!(Compare(*R, B) == -1)) //R >= B
 	{
-		//R <- RW + Ai
-		Left_shift(&Rtmp, WORD_BITLEN); //Rtmp <- Rtmp * W
-		bi_assign(R, Rtmp); //R <- Rtmp
-		*((*R)->a) = *(A->a + i); //R <- Rtmp * W + Ai (0 <= Ai < W)
-
-		//(Qi, R) <- DIVC(R, B)
-		if (-1 == DIVC((*Q)->a + i, &Rtmp, *R, B)) 
-			return ERROR;
+		Positive_ADD_1(Q); //Q <- Q + 1
+		SUB(&Rtmp, *R, B); //R <- R - B
+		bi_assign(R, Rtmp);
 	}
+	bi_delete(&Rtmp);
+}
 
-	if (sign_A == Negative) //A < 0 
-	{
-		ret = Positive_ADD_1(Q); //Q <- Q'+ 1
-		if (ret == 0)
-		{
-			(*Q)->sign = Negative; //Q <- -(Q' + 1)
-			if (-1 == SUB(R, B, Rtmp)) //R <- B - R'
-				return ERROR;
-		}
-	}
-	else
-		bi_assign(R, Rtmp); //R <- Rtmp
-
-	if (sign_B == Negative) //B < 0
-		(*Q)->sign = ((*Q)->sign) ^ 1; //Q <- -Q'
-		
-	A->sign = sign_A; B->sign = sign_B; 
-	bi_refine(*Q);
-	bi_delete(&Rtmp); //Delete temporary variable
-	return 0;
+/*
+	> Compute quotient, Q and remainder, R of A divided by B according to DIV_Type defined in "bn_struct.h"
+	> Input: double pointer of bigint structure Q and R, pointer of bigint structure A and B
+	> Output: None
+*/
+void DIV(bigint** Q, bigint** R, bigint* A, bigint* B)
+{
+#if DIV_Type == 0 //Naive Division
+	Naive_DIV(Q, R, A, B);
+#elif DIV_Type == 1 //Binary Long Division
+	Binary_Long_DIV(Q, R, A, B);
+#elif DIV_Type == 2 //Multi-Precision Long Division
+	Multi_Long_DIV(Q, R, A, B);
+#endif
+	return;
 }

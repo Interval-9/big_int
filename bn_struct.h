@@ -1,3 +1,7 @@
+/*
+	This file declares all macro variables and functions for Big integer operations.
+	The variables that can be changed by the user and the functions to be used by the user are marked separately.
+*/
 #ifndef _BN_STURCT_H_
 #define _BN_STURCT_H_
 
@@ -6,21 +10,35 @@
 #include <string.h>
 #include <memory.h>
 #include <math.h>
+#include <time.h>
 
 //#define ZERORIZE
 
-#define	WORD_BITLEN		64	//8, 32, 64
-#define MUL_Type		2	//0: Schoolbook Mul, 1: Modfied Schoolbook Mul,	2: Karatsuba
-#define	SQU_Type		1	//0: Schoolbook Squ, 1: Karatsuba Squ
-#define	FLAG			3
+//**************** User-alterable variables ******************
+/*
+	> WORD_BITLEN	8 / 32 / 64
+	> MUL_Type		0 (Modified Schoolbook Mul) / 1 (Karatsuba Mul)
+	> SQU_Type		0 (Schoolbook Squ) / 1 (Karatsuba Squ)
+	> DIV_Type		0 (Naive) / 1 (Binary Div) / 2 (Multi Long Div)
+	> MOD_EXP_Type	0 (L2R) / 1 (R2L) / 2 (Montgomery Ladder)
+	> FLAG			3 (END condition for Karatsuba : ? recommend)
+*/
+#define	WORD_BITLEN	    32
+#define MUL_Type		1
+#define	SQU_Type		1
+#define DIV_Type        2
+#define MOD_EXP_Type	2
+#define	FLAG			128
+//*************************************************************
 
+
+// ************* Variables for implementation  ****************
 #define	Negative		1
 #define	Non_Negative	0
 #define	BINARY			2
 #define	DECI			10
 #define	HEXA			16
 #define ERROR			-1
-
 #define	TRUE			1
 #define	FALSE			0
 
@@ -38,26 +56,45 @@ typedef	unsigned int	word;
 #define MASK 0xffffffffffffffff
 #define HARF_MASK 0xffffffff
 typedef	unsigned long long	word;
-#endif	//WORD_BITLEN == 8
+#endif
+//*************************************************************
 
+
+//***************** BigInt Structure *************************
+/*
+	> int sign		0 (Non-Negative) / 1 (Negative)
+	> int wordLen	should be 'more than 0'
+	> word* a		address for big integer
+*/
 typedef struct {
-	int	sign;		//Negative(1) or Non-Negative(0)
-	int	wordLen;	//wordLen >= 0
-	word* a;		// address for big integer
+	int	sign;
+	int	wordLen;
+	word* a;
 } bigint;
+//*************************************************************
 
-#define byte unsigned char
 
+//********** Main functions that the user can use ************
+void ADD(bigint** C, bigint* A, bigint* B);
+void SUB(bigint** C, bigint* A, bigint* B);
+void MUL(bigint** C, bigint* A, bigint* B);
+void SQU(bigint** C, bigint* A);
+void DIV(bigint** Q, bigint** R, bigint* A, bigint* B);
+void MOD_EXP(bigint** C, bigint* x, bigint* n, bigint* M);
+//*************************************************************
+
+
+//********** Basic operations and basic functions *************
 void array_init(word* a, int wordLen);
 void bi_delete(bigint** x);
-int bi_new(bigint** x, int wordLen);
+void bi_new(bigint** x, int wordLen);
 
 int chton(char x);
 void bi_set_by_array(bigint** x, int sign, word* arr, int wordLen);
 void bi_set_by_string(bigint** x, int sign, char* str, char base);
 void bi_show(bigint* x, char base);
 
-int bi_refine(bigint* x);
+void bi_refine(bigint* x);
 void array_copy(word* a, word* b, int wordLen);
 
 void bi_assign(bigint** y, bigint* x);
@@ -87,28 +124,33 @@ void Right_shift(bigint** x, int r);
 void Reduction(bigint** x, int r);
 
 int ADD_ABc(word* Cj, word Aj, word Bj, int cb);
-int ADDC(bigint** C, bigint* A, bigint* B);
-int ADD(bigint** C, bigint* A, bigint* B);
-int Positive_ADD_1(bigint** X);
+void ADDC(bigint** C, bigint* A, bigint* B);
+void Positive_ADD_1(bigint** X);
 
 int SUB_AbB(word* Cj, word Aj, int bb, word Bj);
-int SUBC(bigint** C, bigint* A, bigint* B);
-int SUB(bigint** C, bigint* A, bigint* B);
+void SUBC(bigint** C, bigint* A, bigint* B);
 
 void MUL_AB(word* Cj, word Aj, word Bi);
-int MULC_S(bigint** C, bigint* A, bigint* B);
-int Modified_MULC_S(bigint** C, bigint* A, bigint* B);
-int MULC_K(bigint** C, bigint* A, bigint* B);
-int MUL(bigint** C, bigint* A, bigint* B);
+void MULC_S(bigint** C, bigint* A, bigint* B);
+void MUL_word_bigint(bigint** C, bigint* A, word B);
+void Modified_MULC_S(bigint** C, bigint* A, bigint* B);
+void MULC_K(bigint** C, bigint* A, bigint* B);
 
-int SQU_AB(bigint** C, word A);
-int SQUC_S(bigint** C, bigint* A);
-int SQUC_K(bigint** C, bigint* A);
-int SQU(bigint** C, bigint* A);
+void SQU_AB(bigint** C, word A);
+void SQUC_S(bigint** C, bigint* A);
+void SQUC_K(bigint** C, bigint* A);
 
 int Compute_k(word b);
 void Long_Div_2word(word* Q, word* A, word* B);
-int DIVCC(word* Q, bigint** R, bigint* A, bigint* B);
-int DIVC(word* Q, bigint** R, bigint* A, bigint* B);
-int Long_Div(bigint** Q, bigint** R, bigint* A, bigint* B);
+void DIVCC(word* Q, bigint** R, bigint* A, bigint* B);
+void DIVC(word* Q, bigint** R, bigint* A, bigint* B);
+void Naive_DIV(bigint** Q, bigint** R, bigint* A, bigint* B);
+void Binary_Long_DIV(bigint** Q, bigint** R, bigint* A, bigint* B);
+void Multi_Long_DIV(bigint** Q, bigint** R, bigint* A, bigint* B);
+
+void bi_reduction(bigint** X, bigint* N);
+void MOD_EXP_L2R(bigint** C, bigint* x, bigint* n, bigint* M);
+void MOD_EXP_R2L(bigint** C, bigint* x, bigint* n, bigint* M);
+void MOD_EXP_Mon(bigint** C, bigint* X, bigint* n, bigint* N);
+//*************************************************************
 #endif // !_BN_STURCT_H_

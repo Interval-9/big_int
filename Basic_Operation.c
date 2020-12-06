@@ -1,3 +1,7 @@
+/*
+	This file contains the basic operation functions required to implement the main functions.
+*/
+
 #include "bn_struct.h"
 
 void array_init(word* a, int wordLen)	//initialize array a to 0 (not change sign)
@@ -22,28 +26,40 @@ void bi_delete(bigint** x)	//Delete & Zerorize BigInt
 	*x = NULL;
 }
 
-int bi_new(bigint** x, int wordLen)	//Create BigInt: -1(error), 0(success)
+void bi_new(bigint** x, int wordLen)	//Create BigInt
 {
 	if (*x != NULL)
 		bi_delete(x);
 
 	(*x) = (bigint*)malloc(sizeof(bigint));
 	if (*x == NULL)
-		return ERROR;
+		return;
 
 	(*x)->sign = Non_Negative;
 	(*x)->wordLen = wordLen;
 	(*x)->a = (word*)calloc(wordLen, sizeof(word));
-	return 0;
 }
 
 int chton(char x)	//string to number
 {
 	int ascii = 0;
-	if (x >= '0' && x <= '9')
+	
+	//x: 0 ~ 9
+	if ((x >= '0') & (x <= '9'))
 		ascii = x - '0';
-	else  //x가 a부터 f까지일때
+
+	//x: a ~ f
+	else if ((x >= 'a') & (x <= 'f'))
 		ascii = x - 87;
+
+	//x: A ~ F
+	else if ((x >= 'A') & (x <= 'F'))
+		ascii = x - 55;
+
+	//x: otherwise
+	else
+		return ERROR;
+
 	return ascii;
 }
 
@@ -52,29 +68,30 @@ void bi_set_by_array(bigint** x, int sign, word* arr, int wordLen)	//BigInt <- s
 	/*
 		====== WORD_BITLEN = 8 ======
 		===== A = {0x12, 0x34, 0x56}					 =====
-		===== a[0] = 0x12, a[1] = 0x34, a[2] = 0x56      =====
+		===== A[0] = 0x12, A[1] = 0x34, A[2] = 0x56      =====
 	*/
-	int check = 0;
-	check = bi_new(x, wordLen);
-	if (check == ERROR)
-		printf("Fail: bi_set_by_array(bi_new)\n");
+	int i = 0;
+
+	bi_new(x, wordLen);
 
 	(*x)->sign = sign;
 
-	int i = 0;
 	for (i = 0; i < wordLen; i++)
 		(*x)->a[i] = arr[i];
 
-	check = bi_refine(*x);
-	if (check == ERROR)
-		printf("Fail: bi_set_by_array(bi_refine)\n");
+	bi_refine(*x);
 }
 
 void bi_set_by_string(bigint** x, int sign, char* str, char base)	//BigInt <- base string
 {
-	int wordLen = 0;			//워드 배열 길이
-	int strLen = strlen(str);	//문자열 길이
-	
+	if (str == NULL)
+		return;
+
+	if ((sign != Negative) & (sign != Non_Negative)) {
+		printf("Wrong Sign: %d\n",sign);
+		return;
+	}
+
 	/*
 		====== WORD_BITLEN = 8 ======
 
@@ -85,53 +102,40 @@ void bi_set_by_string(bigint** x, int sign, char* str, char base)	//BigInt <- ba
 		a[0] = 0b 0010 0011	||	a[1] = 0b 0000 0001
 			 = 0x   2    3	||		 = 0x   0    1
 	*/
+	int i = 0;
+	int wordLen = 0;
+	int strLen = (int)strlen(str);
 
-	if (base == 2) // 2진수 문자열의 경우
+	word BB = 0;
+
+	bigint* A = NULL;
+	bigint* B = NULL;
+	bigint* tmp = NULL;
+
+	//X <- 0
+	bi_set_zero(x);
+
+	//A->a[0] = base
+	bi_set_by_array(&A, Non_Negative, &base, 1);
+
+	while (str[i] != '\0')	//until string is END
 	{
-		int i = 0;
-		int j = 0;
+		//x(tmp) <- x*A(base)
+		MUL(&tmp, *x, A);
 
-		wordLen = (int)ceil((double)strLen / WORD_BITLEN);	//필요한 word의 개수를 계산
-		int check = bi_new(x, wordLen);						//bigint를 저장할 구조체 생성
-		if (check == ERROR)
-			printf("Fail: bi_set_by_string(bi_new)\n");
-		(*x)->sign = sign;
-
-		for (i = 0; i < wordLen; i++)	//0과 1을 하나씩 읽어서 word 단위로 저장
-		{
-			for (j = 0; j < WORD_BITLEN; j++) {
-				(*x)->a[i] ^= (chton(str[strLen - (WORD_BITLEN * i) - j - 1]) << j);
-				if (strLen - (WORD_BITLEN * i) - j - 1 == 0)
-					break;
-			}
+		BB = chton(str[i]);
+		if (BB != ERROR) {
+			bi_set_by_array(&B, Non_Negative, &BB, 1);	//B->a[0]=BB
+			//x <- tmp(x*A) + chton(str[i])
+			ADD(x, tmp, B);
 		}
-	}
-	else if (base == 16)
-	{
-		int i = 0;
-		int j = 0;
-		int byteLen = 2*sizeof(word);	//byteLen: unsigned char(2), unsigned int(8), unsigned long long(16)
-
-		wordLen = (int)ceil((double)strLen / byteLen);	//필요한 word의 개수를 계산
-		int check = bi_new(x, wordLen);					//bigint를 저장할 구조체 생성
-		if (check == ERROR)
-			printf("Fail: bi_set_by_string(bi_new)\n");
-		(*x)->sign = sign;
-
-		for (i = 0; i < wordLen; i++)	//숫자를 하나씩 읽어서 word 단위로 저장
-		{
-			for (j = 0; j < byteLen; j++) {
-				(*x)->a[i] ^= (chton(str[strLen - (byteLen * i) - j - 1]) << (4 * j));
-				if (strLen - (byteLen * i) - j - 1 == 0)
-					break;
-			}
-		}
-	}
-	else if(base == 10)   //base = 10
-	{
-		
+		i++;
 	}
 
+	(*x)->sign = sign;
+	bi_delete(&A);
+	bi_delete(&B);
+	bi_delete(&tmp);
 }
 
 void bi_show(bigint* x, char base)
@@ -141,6 +145,7 @@ void bi_show(bigint* x, char base)
 	int bit = 0;
 
 	int sign = x->sign;
+	int bitLen = get_bit_length(x);
 	int wordLen = x->wordLen;
 
 	if (sign == 1)
@@ -148,15 +153,12 @@ void bi_show(bigint* x, char base)
 	
 	if (base == 2)
 	{
-		printf("0b ");
-		for (i = wordLen - 1; i >= 0; i--) {
-			for (j = 0; j < WORD_BITLEN; j++) {
-				bit = ((x->a[i]) >> (WORD_BITLEN - j - 1)) & 0x1;
-				printf("%d", bit);
-			}printf(" ");
+		printf("0b");
+		for (i = bitLen-1; i >= 0; i--) {
+			printf("%d", get_jth_bit_of_bi(x, i));
 		}
 	}
-	else if (base == 16) //16진수일 경우
+	else if (base == 16)
 	{
 		printf("0x");
 #if (WORD_BITLEN == 8)
@@ -173,25 +175,67 @@ void bi_show(bigint* x, char base)
 		}
 #endif
 	}
-	else if (base == 10) //10진수일 경우
+	else if (base == 10)
 	{
-		printf("0d ");
-		unsigned int num = 0;
-		for (i = 0; i < wordLen; i++)
-			num ^= ((x->a[i]) << (8 * sizeof(word) * i));
-		printf("%u", num);
+		printf("0d");
+
+		bigint* A = NULL;
+		bigint* B = NULL;
+		bigint* Q = NULL;
+		bigint* R = NULL;
+
+		word* temp = NULL;
+		word* numArr = NULL;
+		numArr = (word*)malloc(sizeof(word) * 1);
+
+		int arrLen = 0;
+
+		//A <- x
+		bi_assign(&A, x);
+
+		//B <- 10
+		bi_new(&B, 1);
+		B->a[0] = 10;
+
+		//Q(quotient), R(remainder): output
+		while (1) {
+			temp = (word*)realloc(numArr, sizeof(word) * ((size_t)arrLen + 1));
+			if (temp == NULL)
+				return;
+			numArr = temp;
+
+			Multi_Long_DIV(&Q, &R, A, B);
+			bi_assign(&A, Q);
+
+			numArr[arrLen] = R->a[0];
+			arrLen++;
+
+			if (Is_Zero(A))
+				break;
+		}
+
+		for (i = arrLen - 1; i >= 0; i--)
+			printf("%d", numArr[i]);
+
+		bi_delete(&A);
+		bi_delete(&B);
+		bi_delete(&Q);
+		bi_delete(&R);
+		free(temp);
 	}
-	//printf("\n");
 }
 
-int bi_refine(bigint* x)	//Remove Last Zero Words
+void bi_refine(bigint* x)	//Remove Last Zero Words
 {
-	if (x == NULL)
-		return ERROR;
-
 	word* p = NULL;
+	
+	int new_wordLen = 0;
+
+	if (x == NULL)
+		return;
+
 	p = (x->a);
-	int new_wordLen = x->wordLen;
+	new_wordLen = x->wordLen;
 
 	while (new_wordLen > 1)	//at least one word needed
 	{
@@ -203,21 +247,23 @@ int bi_refine(bigint* x)	//Remove Last Zero Words
 	{
 		x->wordLen = new_wordLen;
 		p = (word*)realloc(p, sizeof(word) * new_wordLen);
-	
 		if (p == NULL)
-			return ERROR;
+			return;
 
 		x->a = p;
 	}
 
 	if ((x->wordLen == 1) && (*(x->a) == 0x0))
 		x->sign = Non_Negative;
-	return 0;
 }
 
-void array_copy(word* a, word* b, int wordLen)	//copy array b to array a (not change sign)
+/*
+	> copy array b to array a
+	> not change sign
+	> wordLen(a) = wordLen(b)
+*/
+void array_copy(word* a, word* b, int wordLen)
 {
-	//a와 b의 wordLen은 같아야 함
 	int i = 0;
 	for (i = 0; i < wordLen; i++)
 		a[i] = b[i];
@@ -228,9 +274,7 @@ void bi_assign(bigint** y, bigint* x)	//assign bigint x to new bigint structure 
 	if (*y != NULL)
 		bi_delete(y);
 
-	int check = bi_new(y, x->wordLen);
-	if (check == ERROR)
-		printf("Fail: bi_assign(bi_new)");
+	bi_new(y, x->wordLen);
 
 	(*y)->sign = x->sign;
 	array_copy((*y)->a, x->a, x->wordLen);
@@ -238,9 +282,11 @@ void bi_assign(bigint** y, bigint* x)	//assign bigint x to new bigint structure 
 
 void array_rand(word* dst, int wordLen)
 {	
-	//rand() 이용
-	byte* p = (byte*)dst;
+	unsigned char* p = NULL;
+
 	int cnt = wordLen * sizeof(word);
+
+	p = (unsigned char*)dst;
 	while (cnt > 0) {
 		*p = rand() & 0xff;
 		p++;
@@ -250,9 +296,8 @@ void array_rand(word* dst, int wordLen)
 
 void bi_gen_rand(bigint** x, int sign, int wordLen)
 {
-	int check = bi_new(x, wordLen);
-	if (check == ERROR)
-		printf("Fail: bi_gen_rand(bi_new)");
+	bi_new(x, wordLen);
+
 	(*x)->sign = sign;
 	array_rand((*x)->a, wordLen);
 }
@@ -260,43 +305,29 @@ void bi_gen_rand(bigint** x, int sign, int wordLen)
 /*
 	WORD_BITLEN = 8
 
-	== 0b 0001 0010 0011 ==	(base = 2)
-	== 0x   1    2    3  ==	(base = 16)
-
-	a[0] = 0b 0010 0011	||	a[1] = 0b 0000 0001
-		 = 0x   2    3	||		 = 0x   0    1
-
 	===== get_word_length ======
-	wordLen <- 4
+	wordLen = bigint(A)->wordLen
 	============================
 
 	===== get_bit_length =====
-	bitLen <- 4*WORD_BITLEN
+	bitLen = len( last(1) ~ 0th-bit )
 	==========================
 
 	===== get_jth_bit_of_bi =====
-	j starts at 1
-	0b 0001 0010 0011 = 0b 0000 0001 0010 0011
-	j = 4 -> bit  = 0
-	j = 11 -> bit = 1
+	0b 0010 1011 0010
+	-> 9th: 1, 8th: 0,	7th: 1, 6th: 0, 5th: 1, 4th: 1,	3th:0, 2nd: 0, 1st: 1, 0th: 0
 	=============================
 */
 int get_word_length(bigint* x)	//after refine x, get word length of x
 {
-	int wordLen = 0;
-
-	int check = bi_refine(x);
-	if (check == ERROR)
-		printf("Fail: get_word_length(bi_refine)");
-
-	wordLen = x->wordLen;
+	int wordLen = x->wordLen;
 	
 	return wordLen;
 }
 
 int get_bit_length(bigint* x)	//get bit length by get word length
 {
-	int i;
+	int i = 0;
 	int bitLen = (get_word_length(x) - 1) * WORD_BITLEN;
 	word last_word = x->a[(x->wordLen) - 1];
 
@@ -314,12 +345,12 @@ int get_jth_bit_of_bi(bigint* x, int j)
 {
 	int jth_bit = 0;
 	
-	//j번째 비트가 어느 배열(arr_idx)에 해당하는지
-	int arr_idx = get_word_length(x) - 1 - ((int)j / WORD_BITLEN);
-	//그 배열에서 몇 번째(bit_idx)에 해당하는지
+	//arr_idx where jth-bit located in bigint array
+	int arr_idx = j / WORD_BITLEN;
+	//bit_idx where jth_bit located in arr_idx
 	int bit_idx = j % WORD_BITLEN;
-
-	jth_bit = ((x->a[arr_idx]) >> (WORD_BITLEN - bit_idx)) & 1;
+	
+	jth_bit = ((x->a[arr_idx]) >> bit_idx) & 0x1;
 	return jth_bit;
 }
 
@@ -341,18 +372,14 @@ void flip_bi_sign(bigint* x)	//sign = 0(1) -> flip_sign = 1(0)
 
 void bi_set_one(bigint** x)	//create big int 1
 {
-	int check = bi_new(x, 1);
-	if (check == ERROR)
-		printf("Fail: bi_set_one(bi_new)");
+	bi_new(x, 1);
 
 	(*x)->sign = Non_Negative;
 	(*x)->a[0] = 0x1;
 }
 void bi_set_zero(bigint** x)	//create big num 0
 {
-	int check = bi_new(x, 1);
-	if (check == ERROR)
-		printf("Fail: bi_set_zero(bi_new)");
+	bi_new(x, 1);
 
 	(*x)->sign = Non_Negative;
 	(*x)->a[0] = 0x0;
@@ -399,28 +426,36 @@ int Is_NegativeOne(bigint* x)	//x == -1 -> 1(TRUE),	x != -1 -> 0(FALSE)
 	return TRUE;
 }
 
-int CompareABS(bigint* A, bigint* B) //절댓값 크기 비교: 1(A>B) or -1(A<B) or 0(A=B)
+/*
+	> Compare abs(A), abs(B)
+	> return: 1(|A|>|B|) or -1(|A|<|B|) or 0(|A|=|B|)
+*/
+int CompareABS(bigint* A, bigint* B) 
 {
 	int n = 0, m = 0, j = 0;
 	n = get_word_length(A), m = get_word_length(B);
 
-	if (n > m)		//A의 워드 길이가 더 긴 경우
+	if (n > m)		//wordLen(|A|) > wordLen(|B|)
 		return 1;
 
-	else if (n < m)	//B의 워드 길이가 더 긴 경우
+	if (n < m)	//wordLen(|A|) > wordLen(|B|)
 		return -1;
 
-	for (j = n - 1;j >= 0;j--)		//A의 워드 길이 = B의 워드 길이 인 경우
+	for (j = n - 1;j >= 0;j--)		//wordLen(|A|) = wordLen(|B|)
 	{
-		if (A->a[j] > B->a[j])		//A > B
+		if (A->a[j] > B->a[j])		//|A| > |B|
 			return 1;
-		else if (A->a[j] < B->a[j])	//A < B
+		if (A->a[j] < B->a[j])	//|A| < |B|
 			return -1;
 	}
 	return 0;
 }
 
-int Compare(bigint* A, bigint* B) //절댓값 크기 비교: 1(A>B) or -1(A<B) or 0(A=B)
+/*
+	> Compare A, B
+	> return: 1(A>B) or -1(A<B) or 0(A=B)
+*/
+int Compare(bigint* A, bigint* B)
 {
 	int ret = 0;
 
@@ -429,11 +464,11 @@ int Compare(bigint* A, bigint* B) //절댓값 크기 비교: 1(A>B) or -1(A<B) or 0(A=B
 	else if ((A->sign == 1) && (B->sign == 0))	//A: negative, B: non_negative
 		return -1;
 
-	ret = CompareABS(A, B);	//AB >= 0 인 경우: 절댓값 비교
-
-	if (A->sign == 0)		// A, B: non_negative
+	//if AB >= 0: compare abs(A), abs(B)
+	ret = CompareABS(A, B);
+	if (A->sign == 0)	// A, B: non_negative
 		return ret;
-	else                    // A, B: negative
+	else                // A, B: negative
 		return (-1) * ret;
 }
 
@@ -442,7 +477,8 @@ void Left_shift(bigint** x, int r) //A << r
 	word* p = NULL;
 	p = (*x)->a;
 
-	int k = 0, rr = 0, new_wordlen = 0, i;
+	int i = 0, k = 0, rr = 0, new_wordlen = 0, old_x_wordlen = 0;
+	old_x_wordlen = (*x)->wordLen;
 
 	/*
 	   ===========================
@@ -459,114 +495,140 @@ void Left_shift(bigint** x, int r) //A << r
 	//Case 1: r = wk
 	if (rr == 0) {
 		new_wordlen = (*x)->wordLen + k;
+
 		word* temp = NULL;
 		temp = (word*)realloc(p, sizeof(word) * new_wordlen);
 		if (temp != NULL) {
 			p = temp;
 			(*x)->a = p;
 
-			for (i = 0; i < (*x)->wordLen; i++) //(A_n+k-1, ..., A_k) <- (A_n-1, ..., A_0)
-				(*x)->a[(*x)->wordLen + k - 1 - i] = (*x)->a[(*x)->wordLen - 1 - i];
+			//(A_n+k-1, ..., A_k) <- (A_n-1, ..., A_0)
+			for (i = 0; i < old_x_wordlen; i++)
+				(*x)->a[old_x_wordlen + k - 1 - i] = (*x)->a[old_x_wordlen - 1 - i];
 
-			array_init((*x)->a, k); //(A_k-1, ..., A_0) <- (0, 0, ..., 0)
+			//(A_k-1, ..., A_0) <- (0, 0, ..., 0)
+			array_init((*x)->a, k);
 		}
 		else
-			printf("ERROR: Left_shift(realloc1)");
+			return;
 	}
-	else if (rr > 0 && rr < WORD_BITLEN)//Case 2: r = wk + rr
+
+	//Case 2: r = wk + rr
+	else if ((rr > 0) && (rr < WORD_BITLEN))
 	{
-		new_wordlen = ((*x)->wordLen + (k + 1));
+		//new_wordlen = ((*x)->wordLen + (k + 1));
+		new_wordlen = (old_x_wordlen + (k + 1));
 
 		word* temp = NULL;
-		temp = (word*)realloc(p, sizeof(word) * new_wordlen);
+		temp = (word*)realloc(p, sizeof(word) * new_wordlen);	//size(array): new_wordlen = n(old_x_wordlen)+ k + 1
 		if (temp != NULL) {
 			p = temp;
 			(*x)->a = p;
 
-			(*x)->a[(*x)->wordLen + k] = (((*x)->a[(*x)->wordLen - 1]) >> (WORD_BITLEN - rr)); //A_n+k <- (A_n-1 >> (w - rr))
+			//A_n+k <- (A_(n-1) >> (w - rr))
+			(*x)->a[old_x_wordlen + k] = (((*x)->a[old_x_wordlen - 1]) >> (WORD_BITLEN - rr));
 
-			for (i = 1; i < (*x)->wordLen; i++) //A_n+k-j <- (A_n-j << rr) | (A_n-j-1 >> (w - rr))
-				(*x)->a[(*x)->wordLen + k - i] = (((*x)->a[(*x)->wordLen - i] << rr) | ((*x)->a[(*x)->wordLen - 1 - i] >> (WORD_BITLEN - rr)));
+			//A_n+k-j <- (A_n-j << rr) | (A_n-j-1 >> (w - rr))
+			for (i = 1; i < old_x_wordlen; i++)
+				(*x)->a[old_x_wordlen + k - i] = (((*x)->a[old_x_wordlen - i] << rr) | ((*x)->a[old_x_wordlen - 1 - i] >> (WORD_BITLEN - rr)));
 
-			(*x)->a[k] = ((*x)->a[0] << rr); //A_k <- (A_0 << r)
+			//A_k <- (A_0 << r)
+			(*x)->a[k] = ((*x)->a[0] << rr);
 
-			array_init((*x)->a, k); //(A_k-1, ..., A_0) <- (0, 0, ..., 0)
+			//(A_k-1, ..., A_0) <- (0, 0, ..., 0)
+			array_init((*x)->a, k);
 		}
 		else
-			printf("ERROR: Left_shift(realloc2)");
+			return;
 	}
 	(*x)->wordLen = new_wordlen;
 
-	int check = bi_refine(*x);
-	if (check == ERROR)
-		printf("Fail: Left_shift(bi_refine)");
+	bi_refine(*x);
 }
 
 void Right_shift(bigint** x, int r) //A >> r
 {
-	int k = 0, rr = 0, i;
+	int i = 0, k = 0, rr = 0;
+	int wordLen = (*x)->wordLen;
 
-	if (r >= (*x)->wordLen * WORD_BITLEN) //r >= wn 
+	//r >= wn 
+	if (r >= wordLen * WORD_BITLEN)
 	{
-		array_init((*x)->a, (*x)->wordLen); //0으로 초기화
+		//initialize x to 0
+		array_init((*x)->a, wordLen);
 	}
 	else
 	{
-		if (r >= WORD_BITLEN) //r = k * w + rr
+		//r = k * w + rr
+		if (r >= WORD_BITLEN)
 		{
-			k = (int)(r / WORD_BITLEN); //몫
-			rr = r - k * WORD_BITLEN; //나머지
+			k = (int)(r / WORD_BITLEN);
+			rr = r - k * WORD_BITLEN;
 		}
 		else
 			rr = r;
 	
-		if (rr == 0) //r = wk
+		//r = wk
+		if (rr == 0)
 		{
-			array_copy((*x)->a, (*x)->a + k, (*x)->wordLen - k); //(A_n-k-1,..., A_0) <- (A_n-1,..., A_k+1, A_k)
-			array_init((*x)->a + (*x)->wordLen - k, k); //(A_n-1,..., A_n-k) <- (0, 0,..., 0)
+			array_copy((*x)->a, (*x)->a + k, wordLen - k);	//(A_n-k-1,..., A_0) <- (A_n-1,..., A_k+1, A_k)
+			array_init((*x)->a + wordLen - k, k);		//(A_n-1,..., A_n-k) <- (0, 0,..., 0)
 		}
-		else if (rr > 0) //r = wk + rr
+		//r = wk + rr
+		else if (rr > 0)
 		{
-			for (i = 0;i < (*x)->wordLen - k - 1;i++) //A_j <- (A_k+j+1 << w - rr) | (A_k+j >> rr)
+			//A_j <- (A_k+j+1 << w - rr) | (A_k+j >> rr)
+			for (i = 0;i < wordLen - k - 1;i++)
 				(*x)->a[i] = ((*x)->a[k + 1 + i] << (WORD_BITLEN - rr)) | ((*x)->a[k + i] >> rr);
 
-			(*x)->a[(*x)->wordLen - k - 1] = ((*x)->a[(*x)->wordLen - 1] >> rr); //A_n-k-1 <-(A_n-1 >> rr)
+			//A_n-k-1 <-(A_n-1 >> rr)
+			(*x)->a[wordLen - k - 1] = ((*x)->a[wordLen - 1] >> rr);
 
-			array_init((*x)->a + (*x)->wordLen - k, k); //(A_n-1,..., A_n-k) <- (0, 0,..., 0)
+			//(A_n-1,..., A_n-k) <- (0, 0,..., 0)
+			array_init((*x)->a + wordLen - k, k);
 		}
 	}
-	int check = bi_refine(*x);
-	if (check == ERROR)
-		printf("Fail: Right_shift(bi_refine)");
+
+	bi_refine(*x);
 }
 
-void Reduction(bigint** x, int r) //A mod 2^r
+/*
+	> Input: x, r
+	> Output: x mod 2^r
+*/
+void Reduction(bigint** x, int r)
 {
-	int k = 0, rr = 0, i;
+	int i = 0, k = 0, rr = 0;
+	int wordLen = (*x)->wordLen;
 
-	if (r < (*x)->wordLen * WORD_BITLEN) //r < wn
+	//r < wn
+	if (r < wordLen * WORD_BITLEN)
 	{
-		if (r >= WORD_BITLEN) //r = k * w + rr
+		//r = k * w + rr
+		if (r >= WORD_BITLEN)
 		{
-			k = (int)(r / WORD_BITLEN); //몫
-			rr = r - k * WORD_BITLEN; //나머지
+			k = (int)(r / WORD_BITLEN);
+			rr = r - k * WORD_BITLEN;
 		}
 		else
 			rr = r;
-
-		if (rr == 0) //r = wk
+		
+		//r = wk
+		if (rr == 0)
 		{
-			for (i = k;i < (*x)->wordLen;i++) //(A_n-1,..., A_k) <- (0, 0,..., 0)
+			//(A_n-1,..., A_k) <- (0, 0,..., 0)
+			for (i = k; i < wordLen; i++)
 				(*x)->a[i] = 0;
 		}
-		else //r = wk + rr
+		//r = wk + rr
+		else
 		{
 			(*x)->a[k] = (*x)->a[k] & ((1 << rr) - 1);
-			for (i = k + 1;i < (*x)->wordLen;i++) //(A_n-1,..., A_k) <- (0, 0,..., 0)
+			//(A_n-1,..., A_k) <- (0, 0,..., 0)
+			for (i = k + 1;i < wordLen;i++)
 				(*x)->a[i] = 0;
 		}
 	}
-	int check = bi_refine(*x);
-	if (check == ERROR)
-		printf("Fail: Reduction(bi_refine)");
+
+	bi_refine(*x);
 }
